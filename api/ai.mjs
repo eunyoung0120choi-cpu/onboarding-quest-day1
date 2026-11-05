@@ -58,10 +58,18 @@ export default {
       'access-control-allow-headers':'Content-Type, X-Demo-Code','access-control-max-age':'600','vary':'Origin'};
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
     if(request.method!=='POST')return json({error:'POST만 지원해요.'},405,origin);
-    if(!process.env.ANTHROPIC_API_KEY || !process.env.DEMO_ACCESS_CODE || process.env.DEMO_ACCESS_CODE.length<10)
-      return json({error:'서버 관리자에게 ANTHROPIC_API_KEY 및 10자 이상의 DEMO_ACCESS_CODE 환경변수 설정이 필요해요.'},503,origin);
-    const code=request.headers.get('x-demo-code')||'';
-    if(!equalSecret(code,process.env.DEMO_ACCESS_CODE))return json({error:'데모 접속 코드가 올바르지 않아요.'},401,origin);
+    if(!process.env.ANTHROPIC_API_KEY)
+      return json({error:'AI 서버 설정이 아직 완료되지 않았어요.'},503,origin);
+    // Public portfolio mode is enabled explicitly on Vercel, never by exposing secrets.
+    // WAF independently enforces a per-IP hourly cap on POST /api/ai.
+    const publicDemo=process.env.PUBLIC_DEMO_ENABLED==='true';
+    if(!publicDemo){
+      if(!process.env.DEMO_ACCESS_CODE || process.env.DEMO_ACCESS_CODE.length<10)
+        return json({error:'비공개 AI 체험 설정이 아직 완료되지 않았어요.'},503,origin);
+      const code=request.headers.get('x-demo-code')||'';
+      if(!equalSecret(code,process.env.DEMO_ACCESS_CODE))
+        return json({error:'접속 코드를 확인해 주세요.'},401,origin);
+    }
     const ip=(request.headers.get('x-forwarded-for')||'unknown').split(',')[0].trim();
     if(!allowRequest(ip))return json({error:'1분 호출 횟수 제한에 도달했어요. 잠시 후 다시 시도해 주세요.'},429,origin);
     const n=Number(request.headers.get('content-length'));
