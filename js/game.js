@@ -273,7 +273,7 @@ const AI_URL_KEY='nova_day1_ai_endpoint_v6';
 const storageRead=(k,session=false)=>{try{return (session?sessionStorage:localStorage).getItem(k)||''}catch{return ''}};
 const storageWrite=(k,v,session=false)=>{try{(session?sessionStorage:localStorage).setItem(k,v)}catch{}};
 const storageDelete=(k,session=false)=>{try{(session?sessionStorage:localStorage).removeItem(k)}catch{}};
-const aiConfig=()=>({url:storageRead(AI_URL_KEY).trim(),code:storageRead('nova_day1_access_code',true)});
+const aiConfig=()=>({url:storageRead(AI_URL_KEY).trim()||'https://onboarding-quest-day1.vercel.app/api/ai',code:storageRead('nova_day1_access_code',true)});
 function hasAI(){const v=aiConfig();return /^https:\/\/[^\s]+\/api\/ai\/?$/.test(v.url)&&!!v.code}
 async function requestAI(task,data){const {url,code}=aiConfig();if(!hasAI())throw new Error('AI 연결 설정에서 Vercel 주소와 데모 접속 코드를 입력해 주세요.');
  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),22000);
