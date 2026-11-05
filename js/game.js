@@ -2,6 +2,16 @@
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
+// GA4 counts page/screen visits and AI actions without logging user-written text.
+const novaStat=(type,...args)=>{try{window.novaStats?.[type]?.(...args)}catch{}};
+const novaMenuNames={journey:'오늘의 여정',quests:'퀘스트',diary:'나의 기록',guide:'회사 가이드',badge:'내 배지',passport:'Skill Passport',report:'온보딩 결과 리포트',coach:'AI 코치',scenario:'상황별 시뮬레이션',analytics:'HR 관리자 뷰',settings:'AI 이용 안내',about:'기획자 노트',skilllab:'AI Skill Lab'};
+document.addEventListener('click',e=>{
+  const btn=e.target.closest?.('nav.nav button[data-nav],nav.nav button[data-feature]');
+  if(!btn)return;
+  const id=btn.dataset.feature||btn.dataset.nav;
+  if(novaMenuNames[id])novaStat('view',id,novaMenuNames[id]);
+},true);
+
 const ART={"reception": "assets/office-reception.webp", "lounge": "assets/office-lounge.webp", "workspace": "assets/office-workspace.webp"};
 const Q=[{id:'lobby',time:'09:00',icon:'🏢',label:'로비 체크인',desc:'사원증을 받고 첫 인사를 나눠요',x:52,y:57,art:'reception',sc:'lobby'},
 {id:'team',time:'10:00',icon:'👥',label:'팀 합류',desc:'사무실에서 팀 리더와 버디를 만나요',x:60,y:45,art:'workspace',sc:'office'},
@@ -279,8 +289,8 @@ async function requestAI(task,data){const {url}=aiConfig();
  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),22000);
  try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({task,data}),signal:ctl.signal,cache:'no-store'});
  const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body.error||'AI 서버에 연결할 수 없어요 ('+r.status+')');
- if(typeof body.text!=='string'||!body.text.trim())throw new Error('AI 응답이 비어 있어요.');return body.text.slice(0,7000)
- }catch(e){if(e.name==='AbortError')throw new Error('응답 시간이 길어 연결을 종료했어요. 잠시 후 재시도해 주세요.');throw e}finally{clearTimeout(t)}
+ if(typeof body.text!=='string'||!body.text.trim())throw new Error('AI 응답이 비어 있어요.');novaStat('ai',task,'success');return body.text.slice(0,7000)
+ }catch(e){novaStat('ai',task,'failure');if(e.name==='AbortError')throw new Error('응답 시간이 길어 연결을 종료했어요. 잠시 후 재시도해 주세요.');throw e}finally{clearTimeout(t)}
 }
 function attachNavV6(){const nav=document.querySelector('nav.nav');if(!nav||nav.querySelector('[data-feature]'))return;
  const div=document.createElement('div');div.className='navDivider';nav.appendChild(div);
@@ -436,8 +446,8 @@ function demoSkillReply(id){if(id==='report')return '【시연용 고정 예시 
 if(id==='audit')return '【시연용 고정 예시 · 실제 AI 호출 아님】\n원자료(대상 50명, 수료 46명, 만족도 4.3점)와 AI 초안을 줄마다 비교하세요. 특히 정확한 수치와 추정한 원인, 외부 AI에 제공할 수 없는 자료를 구별해 보세요.';
 return '【시연용 고정 예시 · 실제 AI 호출 아님】\n1. 교육 일정과 수신자 목록을 가상 LMS 파일에서 읽음\n2. 한국시간 09:00 D-7/D-3 발송일을 주말·공휴일 보정하여 계산\n3. 교육 담당자가 명단/본문을 검토하고 승인\n4. 교육생별 개별 전송, 발송 이력 및 실패 알림 기록\n5. 실제 개인정보와 API 사용 권한은 별도 검토';}
 async function skillRequest(task,data){const config=aiConfig();if(!labReady())throw Error('AI 서비스가 준비되지 않았어요.');const ctl=new AbortController(), timer=setTimeout(()=>ctl.abort(),26000);
- try{const resp=await fetch(config.url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({task,data}),signal:ctl.signal,cache:'no-store'});const j=await resp.json().catch(()=>({}));if(!resp.ok)throw Error(j.error||`AI API 응답 오류 ${resp.status}`);return j}
- catch(e){if(e.name==='AbortError')throw Error('AI 응답 시간이 초과됐어요. 다시 시도해 주세요.');throw e}finally{clearTimeout(timer)}}
+ try{const resp=await fetch(config.url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({task,data}),signal:ctl.signal,cache:'no-store'});const j=await resp.json().catch(()=>({}));if(!resp.ok)throw Error(j.error||`AI API 응답 오류 ${resp.status}`);novaStat('ai',task,'success');return j}
+ catch(e){novaStat('ai',task,'failure');if(e.name==='AbortError')throw Error('AI 응답 시간이 초과됐어요. 다시 시도해 주세요.');throw e}finally{clearTimeout(timer)}}
 async function sendSkillPrompt(id){labPersistDraft(id);const s=labBase(id),p=s.prompt.trim();if(p.length<15)return labAlert('AI에게 요청할 내용을 15자 이상 직접 작성해 주세요.');
  const btn=$('labAsk');btn.disabled=true;btn.textContent=labReady()?'AI가 응답하는 중…':'예시를 여는 중…';$('skillNotice').hidden=true;
  try{const demo=!labReady();const r=demo?{text:demoSkillReply(id)}:await skillRequest('skill_chat',{mission:id,prompt:p,history:s.messages.slice(-6).map(x=>({role:x.role,text:x.text.slice(0,1200)}))});
